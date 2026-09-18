@@ -1,5 +1,6 @@
 import os
 import pickle
+from html import escape
 
 import faiss
 import numpy as np
@@ -24,6 +25,10 @@ TOP_K = 6
 
 MIN_RELEVANCE = 0.25
 
+# Number of knowledge categories shown in the navigation bar
+# before the rest are collapsed into a "+N" pill.
+MAX_NAV_CATEGORIES = 4
+
 
 # ============================================================
 # PAGE CONFIG
@@ -33,191 +38,258 @@ st.set_page_config(
     page_title="Knowledge Intelligence",
     page_icon="✦",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 
 # ============================================================
-# ENTERPRISE UI
+# HTML HELPERS
+# ============================================================
+# Streamlit runs st.markdown() through a Markdown parser first.
+# In Markdown, a blank line followed by a line indented with
+# 4+ spaces becomes a CODE BLOCK. That is exactly why the hero
+# HTML was being printed as code. This helper removes all
+# indentation and blank lines so HTML is always rendered as HTML.
+
+def clean_html(markup):
+
+    return "\n".join(
+        line.strip()
+        for line in markup.splitlines()
+        if line.strip()
+    )
+
+
+def render_html(markup):
+
+    st.markdown(
+        clean_html(markup),
+        unsafe_allow_html=True
+    )
+
+
+# ============================================================
+# DESIGN SYSTEM
 # ============================================================
 
-st.markdown(
-    """
+# Message selectors (used inside the CSS below).
+ASSISTANT_MESSAGE = (
+    '[data-testid="stChatMessage"]:has('
+    '[data-testid="stChatMessageAvatarAssistant"], '
+    '[data-testid="chatAvatarIcon-assistant"])'
+)
+
+USER_MESSAGE = (
+    '[data-testid="stChatMessage"]:has('
+    '[data-testid="stChatMessageAvatarUser"], '
+    '[data-testid="chatAvatarIcon-user"])'
+)
+
+APP_CSS = """
 <style>
 
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+
 /* ==========================================================
-   GLOBAL APP
+   DESIGN TOKENS
+   ========================================================== */
+
+:root {
+    --ink: #0C1F2C;
+    --petrol: #0F4C52;
+    --petrol-deep: #0A3A3F;
+    --petrol-soft: #17777C;
+    --mist: #F2F5F5;
+    --paper: #FFFFFF;
+    --line: #DCE4E5;
+    --text: #293B46;
+    --muted: #62757F;
+    --faint: #93A3AB;
+    --saffron: #E3A72F;
+    --ok: #2FB584;
+
+    --font-ui: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Newsreader', Georgia, serif;
+
+    --content-width: 1080px;
+}
+
+
+/* ==========================================================
+   STREAMLIT CHROME: sidebar, header, toolbar, footer
+   ========================================================== */
+
+[data-testid="stSidebar"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+header[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+#MainMenu,
+footer {
+    display: none !important;
+}
+
+
+/* ==========================================================
+   APP CANVAS
    ========================================================== */
 
 .stApp {
+    font-family: var(--font-ui);
+    color: var(--ink);
     background:
-        radial-gradient(
-            circle at 0% 0%,
-            rgba(59, 130, 246, 0.055),
-            transparent 25%
-        ),
-        radial-gradient(
-            circle at 100% 0%,
-            rgba(99, 102, 241, 0.045),
-            transparent 25%
-        ),
-        linear-gradient(
-            180deg,
-            #f8fafc 0%,
-            #f5f7fb 45%,
-            #f8fafc 100%
-        );
-
-    color: #0f172a;
+        linear-gradient(180deg, #E8F0F0 0px, var(--mist) 460px),
+        var(--mist);
+    background-attachment: fixed;
 }
 
-
-/* ==========================================================
-   MAIN CONTAINER
-   ========================================================== */
-
+[data-testid="stMainBlockContainer"],
 .block-container {
-    max-width: 1180px;
-    padding-top: 2.2rem;
-    padding-bottom: 5rem;
+    max-width: var(--content-width);
+    padding: 6.6rem 20px 9rem;
+}
+
+[data-testid="stMarkdownContainer"],
+[data-testid="stChatInput"] textarea {
+    font-family: var(--font-ui);
 }
 
 
 /* ==========================================================
-   SIDEBAR
+   NAVIGATION BAR
    ========================================================== */
 
-section[data-testid="stSidebar"] {
-    border-right: 1px solid #e2e8f0;
+.nav {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+
+    width: min(1040px, calc(100vw - 32px));
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+
+    padding: 9px 12px 9px 10px;
+
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+
+    border: 1px solid rgba(220, 228, 229, 0.95);
+    border-radius: 999px;
+
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 14px 40px rgba(12, 31, 44, 0.09);
 }
 
-section[data-testid="stSidebar"] > div {
-    background:
-        linear-gradient(
-            180deg,
-            #ffffff 0%,
-            #f8fafc 100%
-        );
-}
-
-section[data-testid="stSidebar"] .block-container {
-    padding-top: 1.7rem;
-}
-
-
-/* ==========================================================
-   BRAND
-   ========================================================== */
-
-.brand {
+.nav-brand {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 7px;
+    min-width: 0;
 }
 
-.brand-mark {
-    width: 42px;
-    height: 42px;
-    min-width: 42px;
-
-    border-radius: 12px;
+.nav-mark {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
 
     display: flex;
     align-items: center;
     justify-content: center;
 
-    background:
-        linear-gradient(
-            135deg,
-            #0f172a 0%,
-            #1e293b 55%,
-            #334155 100%
-        );
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--saffron);
 
-    color: #ffffff;
+    font-size: 18px;
+    line-height: 1;
+}
 
-    font-size: 20px;
+.nav-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+}
+
+.nav-name {
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 0.98rem;
+    letter-spacing: -0.015em;
+    white-space: nowrap;
+}
+
+.nav-sub {
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.nav-categories {
+    flex: 1;
+    min-width: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    overflow: hidden;
+}
+
+.nav-chip {
+    padding: 6px 13px;
+
+    border-radius: 999px;
+    background: #EEF3F3;
+    border: 1px solid transparent;
+
+    color: var(--petrol);
+    font-size: 0.78rem;
     font-weight: 600;
-
-    box-shadow:
-        0 8px 22px rgba(15, 23, 42, 0.16);
+    white-space: nowrap;
 }
 
-.brand-name {
-    font-size: 1.05rem;
-    font-weight: 750;
-
-    color: #0f172a;
-
-    letter-spacing: -0.025em;
+.nav-chip-more {
+    background: transparent;
+    border-color: var(--line);
+    color: var(--muted);
 }
 
+.nav-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 
-/* ==========================================================
-   SIDEBAR LABELS
-   ========================================================== */
+    padding: 8px 15px;
 
-.small-label {
-    color: #64748b;
+    border-radius: 999px;
+    background: #E6F5EF;
 
-    font-size: 0.72rem;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.11em;
-
-    font-weight: 750;
-
-    margin-bottom: 9px;
+    color: #17694F;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
+.nav-dot {
+    width: 8px;
+    height: 8px;
 
-/* ==========================================================
-   SIDEBAR CONNECTED CARD
-   ========================================================== */
+    border-radius: 50%;
+    background: var(--ok);
 
-section[data-testid="stSidebar"] .stAlert {
-    border-radius: 12px;
-
-    border: 1px solid #bbf7d0;
-
-    background:
-        linear-gradient(
-            135deg,
-            #f0fdf4,
-            #ecfdf5
-        );
-
-    color: #166534;
-}
-
-
-/* ==========================================================
-   SIDEBAR METRIC
-   ========================================================== */
-
-section[data-testid="stSidebar"] [data-testid="stMetric"] {
-    background: #ffffff;
-
-    border: 1px solid #e2e8f0;
-
-    border-radius: 14px;
-
-    padding: 12px 14px;
-
-    margin-top: 12px;
-
-    box-shadow:
-        0 4px 14px rgba(15, 23, 42, 0.035);
-}
-
-section[data-testid="stSidebar"] [data-testid="stMetricLabel"] {
-    color: #64748b;
-}
-
-section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
-    color: #0f172a;
+    box-shadow: 0 0 0 3px rgba(47, 181, 132, 0.2);
 }
 
 
@@ -227,180 +299,249 @@ section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
 
 .hero {
     position: relative;
-
     overflow: hidden;
 
-    padding: 38px 40px;
+    margin: 6px 0 30px;
+    padding: 46px 48px 38px;
 
-    margin: 12px 0 28px;
-
-    border: 1px solid #e2e8f0;
-
-    border-radius: 22px;
+    border-radius: 30px;
 
     background:
-        linear-gradient(
-            135deg,
-            rgba(255,255,255,0.97) 0%,
-            rgba(248,250,252,0.94) 55%,
-            rgba(239,246,255,0.92) 100%
-        );
+        repeating-radial-gradient(
+            circle at 100% 0%,
+            transparent 0px,
+            transparent 46px,
+            rgba(255, 255, 255, 0.055) 46px,
+            rgba(255, 255, 255, 0.055) 47px
+        ),
+        linear-gradient(135deg, var(--ink) 0%, var(--petrol-deep) 62%, var(--petrol) 100%);
 
     box-shadow:
-        0 20px 55px rgba(15, 23, 42, 0.065),
-        0 2px 8px rgba(15, 23, 42, 0.025);
+        0 30px 70px rgba(12, 31, 44, 0.20),
+        0 2px 6px rgba(12, 31, 44, 0.10);
 }
 
+.hero-title {
+    max-width: 640px;
 
-/* subtle enterprise accent */
+    color: #FFFFFF;
 
-.hero::before {
-    content: "";
-
-    position: absolute;
-
-    width: 260px;
-    height: 260px;
-
-    right: -90px;
-    top: -120px;
-
-    border-radius: 50%;
-
-    background:
-        radial-gradient(
-            circle,
-            rgba(59,130,246,0.10),
-            transparent 68%
-        );
-
-    pointer-events: none;
+    font-family: var(--font-display);
+    font-size: clamp(2.1rem, 4.4vw, 3.3rem);
+    font-weight: 500;
+    line-height: 1.06;
+    letter-spacing: -0.025em;
 }
 
-.hero::after {
-    content: "";
+.hero-text {
+    max-width: 560px;
 
-    position: absolute;
+    margin-top: 16px;
 
-    width: 180px;
-    height: 180px;
+    color: rgba(226, 236, 236, 0.84);
 
-    left: -80px;
-    bottom: -110px;
-
-    border-radius: 50%;
-
-    background:
-        radial-gradient(
-            circle,
-            rgba(99,102,241,0.07),
-            transparent 70%
-        );
-
-    pointer-events: none;
+    font-size: 1.02rem;
+    line-height: 1.7;
 }
 
-
-.hero h1 {
-    position: relative;
-
-    margin: 0;
-
-    color: #0f172a;
-
-    font-size: 2.45rem;
-
-    line-height: 1.12;
-
-    font-weight: 750;
-
-    letter-spacing: -0.045em;
-}
-
-
-.hero p {
-    position: relative;
-
-    margin-top: 11px;
-    margin-bottom: 0;
-
-    color: #64748b;
-
-    font-size: 1rem;
-
-    line-height: 1.65;
-
-    max-width: 720px;
-}
-
-
-/* ==========================================================
-   STATUS PILL
-   ========================================================== */
-
-.status {
-    position: relative;
-
+.hero-status {
     display: inline-flex;
-
     align-items: center;
+    gap: 9px;
 
-    gap: 8px;
+    margin-top: 24px;
 
-    margin-top: 19px;
-
-    padding: 7px 12px;
+    padding: 8px 15px;
 
     border-radius: 999px;
+    background: rgba(47, 181, 132, 0.14);
+    border: 1px solid rgba(47, 181, 132, 0.38);
 
-    background:
-        rgba(236, 253, 245, 0.9);
-
-    border:
-        1px solid #bbf7d0;
-
-    color: #047857;
-
-    font-size: 0.78rem;
-
-    font-weight: 650;
+    color: #8FE3C3;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
-.dot {
-    width: 7px;
-    height: 7px;
+.hero-status .nav-dot {
+    box-shadow: 0 0 0 3px rgba(47, 181, 132, 0.22);
+}
 
-    border-radius: 50%;
+.hero-points {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 30px;
 
-    background: #10b981;
+    margin-top: 32px;
+    padding-top: 22px;
 
-    box-shadow:
-        0 0 0 3px rgba(16,185,129,0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.hero-point {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    color: rgba(226, 236, 236, 0.9);
+
+    font-size: 0.86rem;
+    font-weight: 500;
+}
+
+.hero-point svg {
+    flex-shrink: 0;
+    color: var(--saffron);
 }
 
 
 /* ==========================================================
-   CHAT AREA
+   CHAT MESSAGES
    ========================================================== */
 
 [data-testid="stChatMessage"] {
-    border-radius: 16px;
+    gap: 14px;
+    align-items: flex-start;
 
-    margin-bottom: 10px;
+    margin-bottom: 18px;
+
+    color: var(--text);
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] li {
+    color: var(--text);
+
+    font-size: 0.96rem;
+    line-height: 1.72;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
+    margin-bottom: 0.7rem;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] strong {
+    color: var(--ink);
+    font-weight: 700;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h1,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h2,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h3,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h4 {
+    margin: 0;
+    padding: 0.5rem 0 0.25rem;
+
+    color: var(--ink);
+
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h1 { font-size: 1.45rem; }
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h2 { font-size: 1.28rem; }
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h3 { font-size: 1.12rem; }
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] h4 { font-size: 1rem; }
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] a {
+    color: var(--petrol-soft);
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] code {
+    padding: 2px 6px;
+
+    border-radius: 6px;
+    background: #EAF1F1;
+
+    color: var(--petrol);
+    font-size: 0.86em;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] table {
+    width: 100%;
+
+    border-collapse: separate;
+    border-spacing: 0;
+
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+
+    font-size: 0.88rem;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] th {
+    background: #EEF3F3;
+    color: var(--ink);
+    text-align: left;
+    font-weight: 700;
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] th,
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] td {
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--line);
+}
+
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] tr:last-child td {
+    border-bottom: 0;
 }
 
 
 /* Assistant message */
 
-[data-testid="stChatMessage"]:has(
-    [data-testid="chatAvatarIcon-assistant"]
-) {
-    background: rgba(255,255,255,0.68);
+@ASSISTANT {
+    width: 100%;
 
-    border: 1px solid rgba(226,232,240,0.75);
+    padding: 20px 26px !important;
+
+    background: var(--paper) !important;
+
+    border: 1px solid var(--line);
+    border-radius: 24px 24px 24px 8px;
 
     box-shadow:
-        0 5px 20px rgba(15,23,42,0.025);
+        0 1px 2px rgba(12, 31, 44, 0.04),
+        0 12px 32px rgba(12, 31, 44, 0.06);
+}
+
+[data-testid="stChatMessageAvatarAssistant"],
+[data-testid="chatAvatarIcon-assistant"] {
+    background: var(--ink) !important;
+    color: var(--saffron) !important;
+
+    border-radius: 12px !important;
+}
+
+
+/* User message */
+
+@USER {
+    width: fit-content;
+    max-width: 80%;
+
+    margin-left: auto;
+
+    padding: 14px 22px !important;
+
+    background: var(--petrol) !important;
+
+    border: 0;
+    border-radius: 24px 24px 8px 24px;
+
+    box-shadow: 0 10px 26px rgba(15, 76, 82, 0.24);
+}
+
+@USER [data-testid="stMarkdownContainer"] p,
+@USER [data-testid="stMarkdownContainer"] li {
+    margin: 0;
+
+    color: #FFFFFF !important;
+}
+
+[data-testid="stChatMessageAvatarUser"],
+[data-testid="chatAvatarIcon-user"] {
+    display: none !important;
 }
 
 
@@ -408,19 +549,51 @@ section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
    CHAT INPUT
    ========================================================== */
 
+[data-testid="stBottom"] > div,
+[data-testid="stBottom"] {
+    background: transparent !important;
+}
+
+[data-testid="stBottom"]::before {
+    content: "";
+
+    position: absolute;
+    inset: -48px 0 0 0;
+
+    background: linear-gradient(
+        180deg,
+        rgba(242, 245, 245, 0) 0%,
+        rgba(242, 245, 245, 0.94) 42%,
+        var(--mist) 100%
+    );
+
+    pointer-events: none;
+}
+
+[data-testid="stBottomBlockContainer"] {
+    position: relative;
+
+    max-width: var(--content-width);
+
+    padding: 0 20px 1.7rem;
+}
+
 [data-testid="stChatInput"] {
-    padding-top: 8px;
+    padding: 0;
+    background: transparent !important;
 }
 
 [data-testid="stChatInput"] > div {
-    border-radius: 16px !important;
+    padding: 6px 8px 6px 14px;
 
-    border: 1px solid #dbe3ee !important;
+    background: var(--paper) !important;
 
-    background: rgba(255,255,255,0.94) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 24px !important;
 
     box-shadow:
-        0 10px 30px rgba(15,23,42,0.055) !important;
+        0 1px 2px rgba(12, 31, 44, 0.05),
+        0 16px 44px rgba(12, 31, 44, 0.11) !important;
 
     transition:
         border-color 0.2s ease,
@@ -428,115 +601,216 @@ section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
 }
 
 [data-testid="stChatInput"] > div:focus-within {
-    border-color: #94a3b8 !important;
+    border-color: var(--petrol) !important;
 
     box-shadow:
-        0 0 0 3px rgba(59,130,246,0.07),
-        0 10px 30px rgba(15,23,42,0.055) !important;
+        0 0 0 4px rgba(15, 76, 82, 0.13),
+        0 16px 44px rgba(12, 31, 44, 0.11) !important;
 }
 
+[data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] [data-baseweb="base-input"] {
+    background: transparent !important;
+    border: 0 !important;
+}
 
-/* ==========================================================
-   SOURCE CARDS
-   ========================================================== */
+[data-testid="stChatInput"] textarea {
+    background: transparent !important;
 
-.source-card {
-    padding: 16px 18px;
+    color: var(--ink) !important;
 
-    border-radius: 14px;
+    font-size: 0.98rem;
+}
 
-    border: 1px solid #e2e8f0;
+[data-testid="stChatInput"] textarea::placeholder {
+    color: var(--faint);
+    opacity: 1;
+}
 
-    background:
-        linear-gradient(
-            135deg,
-            #ffffff,
-            #f8fafc
-        );
+[data-testid="stChatInput"] button {
+    width: 42px;
+    height: 42px;
 
-    margin: 9px 0;
+    background: var(--petrol) !important;
+    color: #FFFFFF !important;
 
-    box-shadow:
-        0 5px 18px rgba(15,23,42,0.035);
+    border: 0 !important;
+    border-radius: 16px !important;
+
+    box-shadow: 0 8px 20px rgba(15, 76, 82, 0.32);
 
     transition:
-        transform 0.15s ease,
-        box-shadow 0.15s ease;
+        background 0.15s ease,
+        transform 0.15s ease;
 }
 
-.source-card:hover {
+[data-testid="stChatInput"] button:hover:not(:disabled) {
+    background: var(--petrol-deep) !important;
     transform: translateY(-1px);
-
-    box-shadow:
-        0 8px 24px rgba(15,23,42,0.065);
 }
 
-.source-file {
-    font-weight: 700;
-
-    color: #0f172a;
-
-    font-size: 0.91rem;
+[data-testid="stChatInput"] button:focus-visible {
+    outline: 3px solid rgba(227, 167, 47, 0.7);
+    outline-offset: 2px;
 }
 
-.source-meta {
-    color: #64748b;
+[data-testid="stChatInput"] button:disabled {
+    background: #E4EBEC !important;
+    color: var(--faint) !important;
 
-    font-size: 0.78rem;
-
-    margin-top: 6px;
-
-    line-height: 1.5;
-}
-
-.source-excerpt {
-    color: #475569;
-
-    font-size: 0.82rem;
-
-    line-height: 1.55;
-
-    margin-top: 9px;
+    box-shadow: none;
 }
 
 
 /* ==========================================================
-   EXPANDER
+   SOURCES
    ========================================================== */
 
 [data-testid="stExpander"] {
-    border: 1px solid #e2e8f0 !important;
+    border: 0 !important;
 
-    border-radius: 13px !important;
+    background: transparent !important;
+}
 
-    background: rgba(255,255,255,0.72) !important;
+[data-testid="stExpander"] details {
+    margin-top: 6px;
+
+    background: #F7FAFA !important;
+
+    border: 1px solid var(--line) !important;
+    border-radius: 16px !important;
+}
+
+[data-testid="stExpander"] summary {
+    color: var(--ink);
+
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.source-card {
+    margin: 10px 0;
+    padding: 16px 18px;
+
+    background: var(--paper);
+
+    border: 1px solid var(--line);
+    border-radius: 16px;
+
+    box-shadow: 0 4px 14px rgba(12, 31, 44, 0.04);
+}
+
+.source-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.source-index {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--saffron);
+
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.source-file {
+    flex: 1;
+    min-width: 0;
+
+    color: var(--ink);
+
+    font-size: 0.92rem;
+    font-weight: 700;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.source-score {
+    color: var(--petrol);
+
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.source-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    margin-top: 12px;
+}
+
+.source-chip {
+    padding: 4px 11px;
+
+    border-radius: 999px;
+    background: #EEF3F3;
+
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.score-track {
+    height: 4px;
+
+    margin-top: 14px;
+
+    border-radius: 999px;
+    background: #E4EBEC;
+
+    overflow: hidden;
+}
+
+.score-fill {
+    height: 100%;
+
+    border-radius: 999px;
+    background: var(--saffron);
+}
+
+.source-excerpt {
+    margin-top: 13px;
+
+    color: var(--muted);
+
+    font-size: 0.84rem;
+    line-height: 1.65;
 }
 
 
 /* ==========================================================
-   DIVIDERS
+   FOOTNOTE, SPINNER, SCROLLBAR
    ========================================================== */
 
-hr {
-    border-color: #e2e8f0 !important;
+.footnote {
+    margin-top: 26px;
+
+    color: var(--faint);
+
+    font-size: 0.76rem;
+    text-align: center;
 }
 
-
-/* ==========================================================
-   CAPTIONS
-   ========================================================== */
-
-.stCaption {
-    color: #64748b !important;
+[data-testid="stSpinner"] {
+    color: var(--muted);
 }
-
-
-/* ==========================================================
-   SCROLLBAR
-   ========================================================== */
 
 ::-webkit-scrollbar {
-    width: 7px;
+    width: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -544,45 +818,76 @@ hr {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #C5D2D4;
 
     border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #9FB1B5;
 }
 
 
 /* ==========================================================
-   MOBILE
+   RESPONSIVE
    ========================================================== */
 
-@media (max-width: 768px) {
+@media (max-width: 980px) {
 
+    .nav-categories {
+        display: none;
+    }
+
+    .nav {
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 640px) {
+
+    [data-testid="stMainBlockContainer"],
     .block-container {
-        padding-top: 1rem;
+        padding: 5.6rem 14px 9rem;
+    }
+
+    .nav-sub {
+        display: none;
     }
 
     .hero {
-        padding: 27px 24px;
+        padding: 30px 24px 26px;
 
-        border-radius: 18px;
+        border-radius: 24px;
     }
 
-    .hero h1 {
-        font-size: 1.85rem;
+    .hero-points {
+        flex-direction: column;
+        gap: 12px;
     }
 
-    .hero p {
-        font-size: 0.92rem;
+    @USER {
+        max-width: 94%;
     }
 
+    @ASSISTANT {
+        padding: 16px 18px !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    * {
+        transition: none !important;
+    }
 }
 
 </style>
-""",
-    unsafe_allow_html=True
+"""
+
+render_html(
+    APP_CSS
+    .replace("@ASSISTANT", ASSISTANT_MESSAGE)
+    .replace("@USER", USER_MESSAGE)
 )
 
 
@@ -840,6 +1145,69 @@ relevant document.
 
 
 # ============================================================
+# RENDER SOURCE CARDS
+# ============================================================
+
+def render_sources(sources):
+
+    cards = []
+
+    for number, source in enumerate(
+        sources,
+        start=1
+    ):
+
+        excerpt = (
+            source["text"]
+            .replace("\n", " ")
+        )
+
+        if len(excerpt) > 300:
+
+            excerpt = (
+                excerpt[:300]
+                + "..."
+            )
+
+        score = source["score"]
+
+        percent = max(
+            0,
+            min(100, round(score * 100))
+        )
+
+        version = source.get(
+            "version",
+            "Unknown"
+        )
+
+        cards.append(
+            f"""
+<div class="source-card">
+<div class="source-top">
+<div class="source-index">{number}</div>
+<div class="source-file">📄 {escape(str(source['source_file']))}</div>
+<div class="source-score">Relevance {score:.3f}</div>
+</div>
+<div class="source-meta">
+<span class="source-chip">{escape(str(source['department']))}</span>
+<span class="source-chip">Page {escape(str(source['page']))}</span>
+<span class="source-chip">Version {escape(str(version))}</span>
+</div>
+<div class="score-track">
+<div class="score-fill" style="width: {percent}%"></div>
+</div>
+<div class="source-excerpt">{escape(excerpt)}</div>
+</div>
+"""
+        )
+
+    render_html(
+        "\n".join(cards)
+    )
+
+
+# ============================================================
 # LOAD EVERYTHING
 # ============================================================
 
@@ -862,97 +1230,84 @@ except Exception as error:
 
 
 # ============================================================
-# SIDEBAR
+# NAVIGATION BAR
 # ============================================================
 
-with st.sidebar:
-
-    # IMPORTANT:
-    # HTML is intentionally NOT indented.
-    # Indented HTML can be rendered as a
-    # Markdown code block by Streamlit.
-
-    st.markdown(
-        """
-<div class="brand">
-    <div class="brand-mark">✦</div>
-    <div class="brand-name">
-        Knowledge Intelligence
-    </div>
-</div>
-""",
-        unsafe_allow_html=True
-    )
-
-    st.divider()
-
-    st.markdown(
-        '<div class="small-label">Knowledge Base</div>',
-        unsafe_allow_html=True
-    )
-
-    st.success(
-        "Connected"
-    )
-
-    st.metric(
-        "Indexed chunks",
-        f"{index.ntotal:,}"
-    )
-
-    departments = sorted(
-        {
+departments = sorted(
+    {
+        str(
             item.get(
                 "department",
                 "General"
             )
-            for item in metadata
-        }
-    )
-
-    st.markdown(
-        '<div class="small-label">Categories</div>',
-        unsafe_allow_html=True
-    )
-
-    for department in departments:
-
-        st.caption(
-            f"• {department}"
         )
+        for item in metadata
+    }
+)
 
-    st.divider()
+category_chips = "".join(
+    f'<span class="nav-chip">{escape(department)}</span>'
+    for department in departments[:MAX_NAV_CATEGORIES]
+)
 
-    st.caption(
-        "Answers are grounded in the "
-        "indexed enterprise knowledge base."
+if len(departments) > MAX_NAV_CATEGORIES:
+
+    category_chips += (
+        '<span class="nav-chip nav-chip-more">'
+        f"+{len(departments) - MAX_NAV_CATEGORIES}"
+        "</span>"
     )
+
+render_html(
+    f"""
+<div class="nav">
+<div class="nav-brand">
+<div class="nav-mark">✦</div>
+<div class="nav-text">
+<span class="nav-name">Knowledge Intelligence</span>
+<span class="nav-sub">Enterprise knowledge assistant</span>
+</div>
+</div>
+<div class="nav-categories">{category_chips}</div>
+<div class="nav-status">
+<span class="nav-dot"></span>
+Connected
+</div>
+</div>
+"""
+)
 
 
 # ============================================================
 # HERO
 # ============================================================
 
-st.markdown(
-    """
+CHECK_ICON = (
+    '<svg width="18" height="18" viewBox="0 0 20 20" fill="none">'
+    '<circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/>'
+    '<path d="M6 10.5l2.5 2.5L14 7.5" stroke="currentColor" '
+    'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+    "</svg>"
+)
+
+render_html(
+    f"""
 <div class="hero">
-
-    <h1>Enterprise Knowledge Assistant</h1>
-
-    <p>
-        Search company policies, procedures,
-        compliance documentation and internal
-        knowledge with grounded AI.
-    </p>
-
-    <div class="status">
-        <span class="dot"></span>
-        Knowledge base online
-    </div>
-
+<div class="hero-title">Enterprise Knowledge Assistant</div>
+<div class="hero-text">
+Search company policies, procedures, compliance documentation and internal knowledge with grounded AI.
 </div>
-""",
-    unsafe_allow_html=True
+<div class="hero-status">
+<span class="nav-dot"></span>
+Knowledge base online
+</div>
+<div class="hero-points">
+<div class="hero-point">{CHECK_ICON}Answers come only from your indexed documents</div>
+<div class="hero-point">{CHECK_ICON}Every answer cites the file and page</div>
+<div class="hero-point">{CHECK_ICON}Conflicting policies are flagged, not silently resolved</div>
+</div>
+</div>
+"""
 )
 
 
@@ -981,49 +1336,12 @@ for message in st.session_state.messages:
         ):
 
             with st.expander(
-                "View retrieved sources"
+                f"View retrieved sources ({len(message['sources'])})"
             ):
 
-                for source in message["sources"]:
-
-                    excerpt = (
-                        source["text"]
-                        .replace(
-                            "\n",
-                            " "
-                        )
-                    )
-
-                    if len(excerpt) > 300:
-
-                        excerpt = (
-                            excerpt[:300]
-                            + "..."
-                        )
-
-                    st.markdown(
-                        f"""
-<div class="source-card">
-
-    <div class="source-file">
-        📄 {source['source_file']}
-    </div>
-
-    <div class="source-meta">
-        {source['department']}
-        · Page {source['page']}
-        · Version {source.get('version', 'Unknown')}
-        · Relevance {source['score']:.3f}
-    </div>
-
-    <div class="source-excerpt">
-        {excerpt}
-    </div>
-
-</div>
-""",
-                        unsafe_allow_html=True
-                    )
+                render_sources(
+                    message["sources"]
+                )
 
 
 # ============================================================
@@ -1091,49 +1409,12 @@ if question:
         if results:
 
             with st.expander(
-                "View retrieved sources"
+                f"View retrieved sources ({len(results)})"
             ):
 
-                for source in results:
-
-                    excerpt = (
-                        source["text"]
-                        .replace(
-                            "\n",
-                            " "
-                        )
-                    )
-
-                    if len(excerpt) > 300:
-
-                        excerpt = (
-                            excerpt[:300]
-                            + "..."
-                        )
-
-                    st.markdown(
-                        f"""
-<div class="source-card">
-
-    <div class="source-file">
-        📄 {source['source_file']}
-    </div>
-
-    <div class="source-meta">
-        {source['department']}
-        · Page {source['page']}
-        · Version {source.get('version', 'Unknown')}
-        · Relevance {source['score']:.3f}
-    </div>
-
-    <div class="source-excerpt">
-        {excerpt}
-    </div>
-
-</div>
-""",
-                        unsafe_allow_html=True
-                    )
+                render_sources(
+                    results
+                )
 
     st.session_state.messages.append(
         {
@@ -1142,3 +1423,16 @@ if question:
             "sources": results
         }
     )
+
+
+# ============================================================
+# FOOTNOTE
+# ============================================================
+
+render_html(
+    """
+<div class="footnote">
+Answers are grounded in the indexed enterprise knowledge base.
+</div>
+"""
+)
