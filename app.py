@@ -14,16 +14,11 @@ from sentence_transformers import SentenceTransformer
 # ============================================================
 
 INDEX_FILE = "faiss_index/index.faiss"
-
 METADATA_FILE = "faiss_index/metadata.pkl"
 
-EMBEDDING_MODEL = (
-    "BAAI/bge-small-en-v1.5"
-)
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
-GROQ_MODEL = (
-    "openai/gpt-oss-120b"
-)
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 TOP_K = 6
 
@@ -43,212 +38,550 @@ st.set_page_config(
 
 
 # ============================================================
-# PREMIUM UI
+# ENTERPRISE UI
 # ============================================================
 
 st.markdown(
     """
-    <style>
+<style>
 
-    .stApp {
-        background:
+/* ==========================================================
+   GLOBAL APP
+   ========================================================== */
+
+.stApp {
+    background:
         radial-gradient(
-            circle at 10% 0%,
-            rgba(99,102,241,.09),
-            transparent 28%
-        ),
-        radial-gradient(
-            circle at 90% 10%,
-            rgba(14,165,233,.08),
+            circle at 0% 0%,
+            rgba(59, 130, 246, 0.055),
             transparent 25%
         ),
-        #f7f9fc;
-    }
-
-    .block-container {
-        max-width: 1180px;
-        padding-top: 2rem;
-        padding-bottom: 4rem;
-    }
-
-    .brand {
-        display: flex;
-        align-items: center;
-        gap: 11px;
-        margin-bottom: 8px;
-    }
-
-    .brand-mark {
-        width: 42px;
-        height: 42px;
-        border-radius: 13px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        background:
+        radial-gradient(
+            circle at 100% 0%,
+            rgba(99, 102, 241, 0.045),
+            transparent 25%
+        ),
         linear-gradient(
-            135deg,
-            #111827,
-            #334155
+            180deg,
+            #f8fafc 0%,
+            #f5f7fb 45%,
+            #f8fafc 100%
         );
 
-        color: white;
-        font-size: 20px;
+    color: #0f172a;
+}
 
-        box-shadow:
-        0 10px 30px
-        rgba(15,23,42,.16);
-    }
 
-    .brand-name {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #111827;
-        letter-spacing: -.02em;
+/* ==========================================================
+   MAIN CONTAINER
+   ========================================================== */
+
+.block-container {
+    max-width: 1180px;
+    padding-top: 2.2rem;
+    padding-bottom: 5rem;
+}
+
+
+/* ==========================================================
+   SIDEBAR
+   ========================================================== */
+
+section[data-testid="stSidebar"] {
+    border-right: 1px solid #e2e8f0;
+}
+
+section[data-testid="stSidebar"] > div {
+    background:
+        linear-gradient(
+            180deg,
+            #ffffff 0%,
+            #f8fafc 100%
+        );
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1.7rem;
+}
+
+
+/* ==========================================================
+   BRAND
+   ========================================================== */
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 7px;
+}
+
+.brand-mark {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+
+    border-radius: 12px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background:
+        linear-gradient(
+            135deg,
+            #0f172a 0%,
+            #1e293b 55%,
+            #334155 100%
+        );
+
+    color: #ffffff;
+
+    font-size: 20px;
+    font-weight: 600;
+
+    box-shadow:
+        0 8px 22px rgba(15, 23, 42, 0.16);
+}
+
+.brand-name {
+    font-size: 1.05rem;
+    font-weight: 750;
+
+    color: #0f172a;
+
+    letter-spacing: -0.025em;
+}
+
+
+/* ==========================================================
+   SIDEBAR LABELS
+   ========================================================== */
+
+.small-label {
+    color: #64748b;
+
+    font-size: 0.72rem;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.11em;
+
+    font-weight: 750;
+
+    margin-bottom: 9px;
+}
+
+
+/* ==========================================================
+   SIDEBAR CONNECTED CARD
+   ========================================================== */
+
+section[data-testid="stSidebar"] .stAlert {
+    border-radius: 12px;
+
+    border: 1px solid #bbf7d0;
+
+    background:
+        linear-gradient(
+            135deg,
+            #f0fdf4,
+            #ecfdf5
+        );
+
+    color: #166534;
+}
+
+
+/* ==========================================================
+   SIDEBAR METRIC
+   ========================================================== */
+
+section[data-testid="stSidebar"] [data-testid="stMetric"] {
+    background: #ffffff;
+
+    border: 1px solid #e2e8f0;
+
+    border-radius: 14px;
+
+    padding: 12px 14px;
+
+    margin-top: 12px;
+
+    box-shadow:
+        0 4px 14px rgba(15, 23, 42, 0.035);
+}
+
+section[data-testid="stSidebar"] [data-testid="stMetricLabel"] {
+    color: #64748b;
+}
+
+section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
+    color: #0f172a;
+}
+
+
+/* ==========================================================
+   HERO
+   ========================================================== */
+
+.hero {
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 38px 40px;
+
+    margin: 12px 0 28px;
+
+    border: 1px solid #e2e8f0;
+
+    border-radius: 22px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255,255,255,0.97) 0%,
+            rgba(248,250,252,0.94) 55%,
+            rgba(239,246,255,0.92) 100%
+        );
+
+    box-shadow:
+        0 20px 55px rgba(15, 23, 42, 0.065),
+        0 2px 8px rgba(15, 23, 42, 0.025);
+}
+
+
+/* subtle enterprise accent */
+
+.hero::before {
+    content: "";
+
+    position: absolute;
+
+    width: 260px;
+    height: 260px;
+
+    right: -90px;
+    top: -120px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            rgba(59,130,246,0.10),
+            transparent 68%
+        );
+
+    pointer-events: none;
+}
+
+.hero::after {
+    content: "";
+
+    position: absolute;
+
+    width: 180px;
+    height: 180px;
+
+    left: -80px;
+    bottom: -110px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            rgba(99,102,241,0.07),
+            transparent 70%
+        );
+
+    pointer-events: none;
+}
+
+
+.hero h1 {
+    position: relative;
+
+    margin: 0;
+
+    color: #0f172a;
+
+    font-size: 2.45rem;
+
+    line-height: 1.12;
+
+    font-weight: 750;
+
+    letter-spacing: -0.045em;
+}
+
+
+.hero p {
+    position: relative;
+
+    margin-top: 11px;
+    margin-bottom: 0;
+
+    color: #64748b;
+
+    font-size: 1rem;
+
+    line-height: 1.65;
+
+    max-width: 720px;
+}
+
+
+/* ==========================================================
+   STATUS PILL
+   ========================================================== */
+
+.status {
+    position: relative;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    margin-top: 19px;
+
+    padding: 7px 12px;
+
+    border-radius: 999px;
+
+    background:
+        rgba(236, 253, 245, 0.9);
+
+    border:
+        1px solid #bbf7d0;
+
+    color: #047857;
+
+    font-size: 0.78rem;
+
+    font-weight: 650;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+
+    border-radius: 50%;
+
+    background: #10b981;
+
+    box-shadow:
+        0 0 0 3px rgba(16,185,129,0.12);
+}
+
+
+/* ==========================================================
+   CHAT AREA
+   ========================================================== */
+
+[data-testid="stChatMessage"] {
+    border-radius: 16px;
+
+    margin-bottom: 10px;
+}
+
+
+/* Assistant message */
+
+[data-testid="stChatMessage"]:has(
+    [data-testid="chatAvatarIcon-assistant"]
+) {
+    background: rgba(255,255,255,0.68);
+
+    border: 1px solid rgba(226,232,240,0.75);
+
+    box-shadow:
+        0 5px 20px rgba(15,23,42,0.025);
+}
+
+
+/* ==========================================================
+   CHAT INPUT
+   ========================================================== */
+
+[data-testid="stChatInput"] {
+    padding-top: 8px;
+}
+
+[data-testid="stChatInput"] > div {
+    border-radius: 16px !important;
+
+    border: 1px solid #dbe3ee !important;
+
+    background: rgba(255,255,255,0.94) !important;
+
+    box-shadow:
+        0 10px 30px rgba(15,23,42,0.055) !important;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+[data-testid="stChatInput"] > div:focus-within {
+    border-color: #94a3b8 !important;
+
+    box-shadow:
+        0 0 0 3px rgba(59,130,246,0.07),
+        0 10px 30px rgba(15,23,42,0.055) !important;
+}
+
+
+/* ==========================================================
+   SOURCE CARDS
+   ========================================================== */
+
+.source-card {
+    padding: 16px 18px;
+
+    border-radius: 14px;
+
+    border: 1px solid #e2e8f0;
+
+    background:
+        linear-gradient(
+            135deg,
+            #ffffff,
+            #f8fafc
+        );
+
+    margin: 9px 0;
+
+    box-shadow:
+        0 5px 18px rgba(15,23,42,0.035);
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.source-card:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 8px 24px rgba(15,23,42,0.065);
+}
+
+.source-file {
+    font-weight: 700;
+
+    color: #0f172a;
+
+    font-size: 0.91rem;
+}
+
+.source-meta {
+    color: #64748b;
+
+    font-size: 0.78rem;
+
+    margin-top: 6px;
+
+    line-height: 1.5;
+}
+
+.source-excerpt {
+    color: #475569;
+
+    font-size: 0.82rem;
+
+    line-height: 1.55;
+
+    margin-top: 9px;
+}
+
+
+/* ==========================================================
+   EXPANDER
+   ========================================================== */
+
+[data-testid="stExpander"] {
+    border: 1px solid #e2e8f0 !important;
+
+    border-radius: 13px !important;
+
+    background: rgba(255,255,255,0.72) !important;
+}
+
+
+/* ==========================================================
+   DIVIDERS
+   ========================================================== */
+
+hr {
+    border-color: #e2e8f0 !important;
+}
+
+
+/* ==========================================================
+   CAPTIONS
+   ========================================================== */
+
+.stCaption {
+    color: #64748b !important;
+}
+
+
+/* ==========================================================
+   SCROLLBAR
+   ========================================================== */
+
+::-webkit-scrollbar {
+    width: 7px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+
+    border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media (max-width: 768px) {
+
+    .block-container {
+        padding-top: 1rem;
     }
 
     .hero {
-        padding: 32px;
+        padding: 27px 24px;
 
-        margin:
-        18px 0 22px;
-
-        border:
-        1px solid
-        rgba(148,163,184,.22);
-
-        border-radius: 24px;
-
-        background:
-        rgba(255,255,255,.78);
-
-        backdrop-filter:
-        blur(14px);
-
-        box-shadow:
-        0 18px 50px
-        rgba(15,23,42,.07);
+        border-radius: 18px;
     }
 
     .hero h1 {
-        margin: 0;
-
-        font-size: 2.35rem;
-
-        letter-spacing: -.045em;
-
-        color: #0f172a;
+        font-size: 1.85rem;
     }
 
     .hero p {
-        margin-top: 9px;
-
-        color: #64748b;
-
-        font-size: 1rem;
-
-        max-width: 720px;
+        font-size: 0.92rem;
     }
 
-    .status {
-        display: inline-flex;
+}
 
-        align-items: center;
-
-        gap: 7px;
-
-        margin-top: 17px;
-
-        padding:
-        7px 12px;
-
-        border-radius: 999px;
-
-        background: #ecfdf5;
-
-        color: #047857;
-
-        font-size: .82rem;
-
-        font-weight: 600;
-    }
-
-    .dot {
-        width: 7px;
-        height: 7px;
-
-        border-radius: 50%;
-
-        background: #10b981;
-    }
-
-    .source-card {
-        padding: 15px 17px;
-
-        border-radius: 16px;
-
-        border:
-        1px solid #e5e7eb;
-
-        background: white;
-
-        margin: 9px 0;
-
-        box-shadow:
-        0 5px 18px
-        rgba(15,23,42,.035);
-    }
-
-    .source-file {
-        font-weight: 700;
-
-        color: #111827;
-    }
-
-    .source-meta {
-        color: #64748b;
-
-        font-size: .82rem;
-
-        margin-top: 5px;
-    }
-
-    .source-excerpt {
-        color: #475569;
-
-        font-size: .84rem;
-
-        line-height: 1.5;
-
-        margin-top: 8px;
-    }
-
-    .small-label {
-        color: #64748b;
-
-        font-size: .76rem;
-
-        text-transform: uppercase;
-
-        letter-spacing: .08em;
-
-        font-weight: 700;
-    }
-
-    section[data-testid="stSidebar"] {
-        border-right:
-        1px solid #e5e7eb;
-    }
-
-    section[data-testid="stSidebar"] > div {
-        background:
-        rgba(255,255,255,.88);
-    }
-
-    </style>
-    """,
+</style>
+""",
     unsafe_allow_html=True
 )
 
@@ -260,22 +593,17 @@ st.markdown(
 @st.cache_resource
 def load_resources():
 
-    if not os.path.exists(
-        INDEX_FILE
-    ):
+    if not os.path.exists(INDEX_FILE):
         raise FileNotFoundError(
             "FAISS index not found."
         )
 
-    if not os.path.exists(
-        METADATA_FILE
-    ):
+    if not os.path.exists(METADATA_FILE):
         raise FileNotFoundError(
             "Metadata file not found."
         )
 
     if "GROQ_API_KEY" not in st.secrets:
-
         raise ValueError(
             "GROQ_API_KEY is missing "
             "from Streamlit Secrets."
@@ -294,10 +622,8 @@ def load_resources():
             file
         )
 
-    embedding_model = (
-        SentenceTransformer(
-            EMBEDDING_MODEL
-        )
+    embedding_model = SentenceTransformer(
+        EMBEDDING_MODEL
     )
 
     groq_client = Groq(
@@ -326,11 +652,9 @@ def retrieve_documents(
     top_k=TOP_K
 ):
 
-    query_embedding = (
-        embedding_model.encode(
-            [question],
-            normalize_embeddings=True
-        )
+    query_embedding = embedding_model.encode(
+        [question],
+        normalize_embeddings=True
     )
 
     query_embedding = np.asarray(
@@ -338,11 +662,9 @@ def retrieve_documents(
         dtype="float32"
     )
 
-    scores, indices = (
-        index.search(
-            query_embedding,
-            top_k
-        )
+    scores, indices = index.search(
+        query_embedding,
+        top_k
     )
 
     results = []
@@ -359,15 +681,11 @@ def retrieve_documents(
             index_position
         ].copy()
 
-        item["score"] = float(
-            score
-        )
+        item["score"] = float(score)
 
         if item["score"] >= MIN_RELEVANCE:
 
-            results.append(
-                item
-            )
+            results.append(item)
 
     return results
 
@@ -409,9 +727,7 @@ Content:
 """
         )
 
-    return "\n".join(
-        context
-    )
+    return "\n".join(context)
 
 
 # ============================================================
@@ -501,13 +817,11 @@ relevant document.
             messages=[
                 {
                     "role": "system",
-                    "content":
-                        system_prompt
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content":
-                        user_prompt
+                    "content": user_prompt
                 }
             ],
 
@@ -553,29 +867,27 @@ except Exception as error:
 
 with st.sidebar:
 
+    # IMPORTANT:
+    # HTML is intentionally NOT indented.
+    # Indented HTML can be rendered as a
+    # Markdown code block by Streamlit.
+
     st.markdown(
         """
-        <div class="brand">
-
-            <div class="brand-mark">
-                ✦
-            </div>
-
-            <div class="brand-name">
-                Knowledge Intelligence
-            </div>
-
-        </div>
-        """,
+<div class="brand">
+    <div class="brand-mark">✦</div>
+    <div class="brand-name">
+        Knowledge Intelligence
+    </div>
+</div>
+""",
         unsafe_allow_html=True
     )
 
     st.divider()
 
     st.markdown(
-        '<div class="small-label">'
-        'Knowledge Base'
-        '</div>',
+        '<div class="small-label">Knowledge Base</div>',
         unsafe_allow_html=True
     )
 
@@ -599,9 +911,7 @@ with st.sidebar:
     )
 
     st.markdown(
-        '<div class="small-label">'
-        'Categories'
-        '</div>',
+        '<div class="small-label">Categories</div>',
         unsafe_allow_html=True
     )
 
@@ -625,25 +935,23 @@ with st.sidebar:
 
 st.markdown(
     """
-    <div class="hero">
+<div class="hero">
 
-        <h1>
-            Enterprise Knowledge Assistant
-        </h1>
+    <h1>Enterprise Knowledge Assistant</h1>
 
-        <p>
-            Search company policies, procedures,
-            compliance documentation and internal
-            knowledge with grounded AI.
-        </p>
+    <p>
+        Search company policies, procedures,
+        compliance documentation and internal
+        knowledge with grounded AI.
+    </p>
 
-        <div class="status">
-            <span class="dot"></span>
-            Knowledge base online
-        </div>
-
+    <div class="status">
+        <span class="dot"></span>
+        Knowledge base online
     </div>
-    """,
+
+</div>
+""",
     unsafe_allow_html=True
 )
 
@@ -657,9 +965,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-for message in (
-    st.session_state.messages
-):
+for message in st.session_state.messages:
 
     with st.chat_message(
         message["role"]
@@ -670,19 +976,15 @@ for message in (
         )
 
         if (
-            message["role"] ==
-            "assistant"
-            and
-            message.get("sources")
+            message["role"] == "assistant"
+            and message.get("sources")
         ):
 
             with st.expander(
                 "View retrieved sources"
             ):
 
-                for source in (
-                    message["sources"]
-                ):
+                for source in message["sources"]:
 
                     excerpt = (
                         source["text"]
@@ -701,28 +1003,25 @@ for message in (
 
                     st.markdown(
                         f"""
-                        <div class="source-card">
+<div class="source-card">
 
-                            <div class="source-file">
-                                📄
-                                {source['source_file']}
-                            </div>
+    <div class="source-file">
+        📄 {source['source_file']}
+    </div>
 
-                            <div class="source-meta">
-                                {source['department']}
-                                · Page {source['page']}
-                                · Version
-                                {source.get('version', 'Unknown')}
-                                · Relevance
-                                {source['score']:.3f}
-                            </div>
+    <div class="source-meta">
+        {source['department']}
+        · Page {source['page']}
+        · Version {source.get('version', 'Unknown')}
+        · Relevance {source['score']:.3f}
+    </div>
 
-                            <div class="source-excerpt">
-                                {excerpt}
-                            </div>
+    <div class="source-excerpt">
+        {excerpt}
+    </div>
 
-                        </div>
-                        """,
+</div>
+""",
                         unsafe_allow_html=True
                     )
 
@@ -757,13 +1056,11 @@ if question:
             "Searching knowledge base..."
         ):
 
-            results = (
-                retrieve_documents(
-                    question,
-                    index,
-                    metadata,
-                    embedding_model
-                )
+            results = retrieve_documents(
+                question,
+                index,
+                metadata,
+                embedding_model
             )
 
         if not results:
@@ -781,12 +1078,10 @@ if question:
                 "Generating grounded answer..."
             ):
 
-                answer = (
-                    generate_answer(
-                        question,
-                        results,
-                        groq_client
-                    )
+                answer = generate_answer(
+                    question,
+                    results,
+                    groq_client
                 )
 
         st.markdown(
@@ -818,28 +1113,25 @@ if question:
 
                     st.markdown(
                         f"""
-                        <div class="source-card">
+<div class="source-card">
 
-                            <div class="source-file">
-                                📄
-                                {source['source_file']}
-                            </div>
+    <div class="source-file">
+        📄 {source['source_file']}
+    </div>
 
-                            <div class="source-meta">
-                                {source['department']}
-                                · Page {source['page']}
-                                · Version
-                                {source.get('version', 'Unknown')}
-                                · Relevance
-                                {source['score']:.3f}
-                            </div>
+    <div class="source-meta">
+        {source['department']}
+        · Page {source['page']}
+        · Version {source.get('version', 'Unknown')}
+        · Relevance {source['score']:.3f}
+    </div>
 
-                            <div class="source-excerpt">
-                                {excerpt}
-                            </div>
+    <div class="source-excerpt">
+        {excerpt}
+    </div>
 
-                        </div>
-                        """,
+</div>
+""",
                         unsafe_allow_html=True
                     )
 
